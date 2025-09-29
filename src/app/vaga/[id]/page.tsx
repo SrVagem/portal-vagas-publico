@@ -2,6 +2,7 @@ import type { Vaga } from "@/lib/api";
 import CandidaturaForm from "@/components/CandidaturaForm";
 import type { Metadata } from "next";
 import { getBaseUrl } from "@/lib/server";
+import Link from "next/link";
 
 async function getVaga(id: number): Promise<Vaga | null> {
   const base = getBaseUrl();
@@ -10,7 +11,7 @@ async function getVaga(id: number): Promise<Vaga | null> {
       method: "POST",
       headers: { "content-type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({ id_vaga: id })
+      body: JSON.stringify({ id_vaga: id }),
     });
     if (!res.ok) return null;
     return await res.json();
@@ -19,7 +20,7 @@ async function getVaga(id: number): Promise<Vaga | null> {
   }
 }
 
-export async function generateMetadata({ params }:{ params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const id = Number(params.id);
   const vaga = Number.isFinite(id) ? await getVaga(id) : null;
   const title = vaga?.titulo ? `${vaga.titulo} | Vaga #${vaga.id_vaga} | Portal RH` : `Vaga #${params.id} | Portal RH`;
@@ -27,21 +28,27 @@ export async function generateMetadata({ params }:{ params: { id: string } }): P
   return {
     title,
     description,
-    openGraph: { title, description }
+    openGraph: { title, description },
   };
 }
 
-export default async function VagaDetalhePage({ params }:{ params: { id: string } }) {
+export default async function VagaDetalhePage({ params }: { params: { id: string } }) {
   const id = Number(params.id);
   const vaga = Number.isFinite(id) ? await getVaga(id) : null;
 
   if (!vaga) {
-    return <main className="mx-auto max-w-4xl px-4 py-10"><p className="text-neutral-400">Vaga não encontrada.</p></main>;
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-10">
+        <p className="text-neutral-400">Vaga não encontrada.</p>
+      </main>
+    );
   }
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <a href="/" className="text-sm text-neutral-400 hover:underline">&larr; Voltar</a>
+      <Link href="/" className="text-sm text-neutral-400 hover:underline">
+        &larr; Voltar
+      </Link>
       <h1 className="mt-2 text-2xl font-semibold">{vaga.titulo ?? `Vaga #${vaga.id_vaga}`}</h1>
       <div className="mt-2 text-sm text-neutral-400 flex gap-3">
         {vaga.local_trabalho && <span>{vaga.local_trabalho}</span>}

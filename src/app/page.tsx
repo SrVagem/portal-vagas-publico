@@ -7,25 +7,35 @@ import { getBaseUrl } from "@/lib/server";
 
 const DEFAULT_PAGE_SIZE = 8;
 
-// Try to normalize different upstream shapes/keys into our Vaga type
-function normalize(row: any): Vaga | null {
-  if (!row) return null;
-  const get = (k: string) => row[k] ?? row[k?.toUpperCase?.()] ?? row[k?.toLowerCase?.()];
-  const id = Number(get("id_vaga") ?? get("id") ?? get("codigo") ?? get("idvaga"));
+type UpstreamRow = Record<string, unknown>;
+
+function normalize(row: UpstreamRow): Vaga | null {
+  const get = (k: string): unknown =>
+    row[k] ??
+    (row as Record<string, unknown>)[(k as any)?.toUpperCase?.()] ??
+    (row as Record<string, unknown>)[(k as any)?.toLowerCase?.()];
+
+  const idRaw = get("id_vaga") ?? get("id") ?? get("codigo") ?? get("idvaga");
+  const id = typeof idRaw === "string" ? parseInt(idRaw, 10) : Number(idRaw);
   if (!Number.isFinite(id)) return null;
+
+  const salarioRaw = get("salario");
+  const salarioNum =
+    typeof salarioRaw === "string" ? Number(salarioRaw.replace(/[^0-9.-]+/g, "")) : Number(salarioRaw);
+
   return {
     id_vaga: id,
-    titulo: get("titulo") ?? get("title"),
-    descricao: get("descricao") ?? get("description"),
-    requisitos: get("requisitos") ?? get("requirements"),
-    local_trabalho: get("local_trabalho") ?? get("local") ?? get("cidade"),
-    tipo_contrato: get("tipo_contrato") ?? get("tipo") ?? get("contrato"),
-    salario: Number(get("salario")),
-    beneficios: get("beneficios"),
-    status: get("status"),
-    responsavel: get("responsavel"),
-    data_abertura: get("data_abertura") ?? get("abertura"),
-    data_fechamento: get("data_fechamento") ?? get("fechamento"),
+    titulo: (get("titulo") ?? get("title")) as string | undefined,
+    descricao: (get("descricao") ?? get("description")) as string | undefined,
+    requisitos: (get("requisitos") ?? get("requirements")) as string | undefined,
+    local_trabalho: (get("local_trabalho") ?? get("local") ?? get("cidade")) as string | undefined,
+    tipo_contrato: (get("tipo_contrato") ?? get("tipo") ?? get("contrato")) as string | undefined,
+    salario: Number.isFinite(salarioNum) ? (salarioNum as number) : undefined,
+    beneficios: get("beneficios") as string | undefined,
+    status: get("status") as string | undefined,
+    responsavel: get("responsavel") as string | undefined,
+    data_abertura: (get("data_abertura") ?? get("abertura")) as string | undefined,
+    data_fechamento: (get("data_fechamento") ?? get("fechamento")) as string | null | undefined,
   };
 }
 
@@ -36,11 +46,11 @@ async function fetchVagas(): Promise<Vaga[]> {
       method: "POST",
       headers: { "content-type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     });
     if (!res.ok) return [];
-    const data = await res.json().catch(() => []);
-    const arr = Array.isArray(data) ? data : [];
+    const data = (await res.json().catch(() => [])) as unknown;
+    const arr: UpstreamRow[] = Array.isArray(data) ? (data as UpstreamRow[]) : [];
     return arr.map(normalize).filter(Boolean) as Vaga[];
   } catch {
     return [];
@@ -56,11 +66,15 @@ export const metadata: Metadata = {
   description: "Veja as oportunidades disponíveis e candidate-se online.",
   openGraph: {
     title: "Vagas abertas | Portal RH",
-    description: "Veja as oportunidades disponíveis e candidate-se online."
-  }
+    description: "Veja as oportunidades disponíveis e candidate-se online.",
+  },
 };
 
-export default async function HomePage({ searchParams } : { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const q = typeof searchParams.q === "string" ? searchParams.q : "";
   const tipo = typeof searchParams.tipo === "string" ? searchParams.tipo : "";
   const local = typeof searchParams.local === "string" ? searchParams.local : "";
@@ -69,8 +83,8 @@ export default async function HomePage({ searchParams } : { searchParams: { [key
 
   const all = await fetchVagas();
 
-  const filtered = all.filter(v => {
-    const okQ = q ? (norm(v.titulo).includes(norm(q)) || norm(v.descricao).includes(norm(q))) : true;
+  const filtered = all.filter((v) => {
+    const okQ = q ? norm(v.titulo).includes(norm(q)) || norm(v.descricao).includes(norm(q)) : true;
     const okLocal = local ? norm(v.local_trabalho).includes(norm(local)) : true;
     const okTipo = tipo ? norm(v.tipo_contrato) === norm(tipo) : true;
     return okQ && okLocal && okTipo;
@@ -101,14 +115,7 @@ export default async function HomePage({ searchParams } : { searchParams: { [key
         </section>
       )}
 
-      <Pagination
-        page={page}
-        total={filtered.length}
-        pageSize={pageSize}
-        q={q}
-        tipo={tipo}
-        local={local}
-      />
+      <Pagination page={page} total={filtered.length} pageSize={pageSize} q={q} tipo={tipo} local={local} />
     </main>
   );
 }

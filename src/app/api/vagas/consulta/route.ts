@@ -13,8 +13,7 @@ export async function POST() {
       status: upstream.status,
       headers: { "content-type": "application/json" },
     });
-  } catch (e: any) {
-    console.error("[public/consulta] erro:", e?.message || e);
+  } catch (_e: unknown) {
     return new Response(JSON.stringify([]), { status: 200 });
   }
 }
